@@ -1,0 +1,48 @@
+function T = swir_tempestim(frames, T_LU, S_LU, bitlength)
+%   T = SWIR_TEMPESTIM(frames, T_LU, S_LU, bitlength) estimates the
+%   temperature of each pixel by interpolating a calibration lookup table
+%   relating pixel signal intensity (DN) to temperature.
+%
+%   Pixels with signal intensities below 10% or above 90% of the camera's
+%   maximum digital value are considered unreliable (underexposed or
+%   overexposed) and assigned NaN.
+%
+%   Inputs:
+%       frames      - M-by-N-by-K array of monochrome image frames (DN).
+%       T_LU        - Lookup table of calibrated temperatures.
+%       S_LU        - Corresponding lookup table of signal intensities (DN).
+%       bitlength   - Camera bit depth (default: 8).
+%
+%   Output:
+%       T           - M-by-N-by-K array of estimated pixel temperatures,
+%                     with unreliable pixels assigned NaN.
+%
+%   Note:
+%       Temperature estimation relies on the calibration relationship
+%       between signal intensity and temperature. Its validity depends
+%       on the calibration conditions and measurement setup.
+
+arguments
+    frames (:,:,:)
+    T_LU (1,1) {mustBeInteger, mustBePositive}
+    S_LU (1,1) {mustBeInteger, mustBePositive}
+    bitlength (1,1) {mustBeInteger, mustBePositive} = 8
+end
+
+sz_frame = size(frames, [1 2]);
+n_frames = size(frames, 3);
+T = zeros(size(frames));
+
+for i_frame = 1:n_frames
+    frame = frames(:,:,i_frame);
+    T_loc = interp1(S_LU, T_LU, frame(:));
+    T_loc = reshape(T_loc, sz_frame);
+    T(:,:,i_frame) = T_loc;
+end
+
+max_DN = 2^bitlength - 1;
+underexposed_thr = max_DN * 0.1;
+overexposed_thr = max_DN * 0.9; 
+T(frames < underexposed_thr) = nan; % temperature estimation does not make sense if pixel is underexposed
+T(frames > overexposed_thr) = nan; % temperature estimation does not make sense if pixel is overexposed
+end
